@@ -1,8 +1,8 @@
-// ChatGPT Automator - Content Script v1.3.0
+// ChatGPT Automator - Content Script v1.4.0
 console.log('[ChatGPT Automator] Content script carregado no ChatGPT.');
 
 // -------------------------------------------------------------
-// 1. Localizadores Universais de Elementos (Suporta Layout Novo e Antigo)
+// 1. Localizadores Universais
 // -------------------------------------------------------------
 function getPromptElement() {
   return (
@@ -30,19 +30,15 @@ function getStopButton() {
   );
 }
 
-// Inserir texto no prompt simulando digitação humana
 function setPromptText(text) {
   const el = getPromptElement();
   if (!el) throw new Error('Campo de mensagem do ChatGPT não encontrado.');
 
   el.focus();
-
   if (el.tagName.toLowerCase() === 'textarea') {
     el.value = text;
   } else {
-    // Para contenteditable / div rica
     el.innerText = text;
-    // Em alguns builds do ChatGPT, parágrafos internos são necessários
     if (!el.innerText || el.innerText.trim() === '') {
       el.innerHTML = `<p>${text}</p>`;
     }
@@ -52,7 +48,6 @@ function setPromptText(text) {
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-// Anexar arquivos via input oculto do ChatGPT
 async function attachFiles(filesData) {
   if (!filesData || filesData.length === 0) return;
 
@@ -80,7 +75,7 @@ async function attachFiles(filesData) {
 }
 
 // -------------------------------------------------------------
-// 2. Extração de Imagens e Conversão
+// 2. Extração de Imagens
 // -------------------------------------------------------------
 async function imageToBase64(imgElement) {
   try {
@@ -148,149 +143,158 @@ async function extractImagesFromElement(rootElement) {
 }
 
 // -------------------------------------------------------------
-// 3. Leitura Completa de Mensagens com Seletores Amplos
+// 3. Leitura Robusta e Flexível do Chat
 // -------------------------------------------------------------
-function getAllTurnElements() {
-  // 1. Tentar artigos com conversation-turn
-  let turns = Array.from(document.querySelectorAll('article[data-testid^="conversation-turn"]'));
-  if (turns.length > 0) return turns;
+function extractAllMessagesFromDOM() {
+  const results = [];
 
-  // 2. Tentar qualquer article na página
-  turns = Array.from(document.querySelectorAll('article'));
-  if (turns.length > 0) return turns;
+  // 1. Procurar por artigos
+  const articles = Array.from(document.querySelectorAll('article'));
+  if (articles.length > 0) {
+    for (let i = 0; i < articles.length; i++) {
+      const art = articles[i];
+      const text = art.innerText.trim();
+      if (!text) continue;
 
-  // 3. Tentar contêineres com atributos de autor
-  turns = Array.from(document.querySelectorAll('[data-message-author-role]'));
-  if (turns.length > 0) return turns;
+      const isUser = !!(
+        art.querySelector('[data-message-author-role="user"]') ||
+        art.getAttribute('data-testid')?.includes('user') ||
+        text.startsWith('Você disse:')
+      );
 
-  // 4. Tentar blocos de markdown de resposta
-  turns = Array.from(document.querySelectorAll('.markdown'));
-  if (turns.length > 0) return turns;
+      results.push({
+        index: i,
+        role: isUser ? 'user' : 'assistant',
+        text: text.replace(/^Você disse:\s*/i, '').replace(/^ChatGPT disse:\s*/i, '').trim(),
+        element: art
+      });
+    }
+    if (results.length > 0) return results;
+  }
 
-  return [];
+  // 2. Fallback: procurar por elementos com markdown
+  const markdowns = Array.from(document.querySelectorAll('.markdown'));
+  if (markdowns.length > 0) {
+    for (let i = 0; i < markdowns.length; i++) {
+      results.push({
+        index: i,
+        role: 'assistant',
+        text: markdowns[i].innerText.trim(),
+        element: markdowns[i]
+      });
+    }
+    return results;
+  }
+
+  // 3. Fallback extremo: pegar o container principal de conversa
+  const main = document.querySelector('main');
+  if (main) {
+    const pTags = Array.from(main.querySelectorAll('p'));
+    if (pTags.length > 0) {
+      const lastP = pTags[pTags.length - 1];
+      results.push({
+        index: 0,
+        role: 'assistant',
+        text: lastP.innerText.trim(),
+        element: lastP
+      });
+    }
+  }
+
+  return results;
 }
 
-async function parseTurn(turnElement, index) {
-  const authorAttr = turnElement.getAttribute('data-message-author-role');
-  const hasUserAuthor = authorAttr === 'user' || turnElement.querySelector('[data-message-author-role="user"]');
-  const hasUserTestId = turnElement.getAttribute('data-testid')?.includes('user');
-  const hasUserText = turnElement.innerText.includes('Você disse:');
+async function getLastMessage() {
+  const msgs = extractAllMessagesFromDOM();
+  if (msgs.length === 0) {
+    return { role: 'assistant', text: '', images: [] };
+  }
 
-  const isUser = !!(hasUserAuthor || hasUserTestId || hasUserText);
-  const role = isUser ? 'user' : 'assistant';
-
-  const markdownEl = turnElement.querySelector('.markdown') || turnElement;
-  const text = markdownEl.innerText.trim();
-
-  const codeBlocks = Array.from(turnElement.querySelectorAll('pre code')).map(code => ({
-    code: code.innerText,
-    language: (code.className.match(/language-(\w+)/) || [])[1] || 'text'
-  }));
-
-  const images = await extractImagesFromElement(turnElement);
-
+  // Encontrar a última mensagem do assistente
+  const assistantMsgs = msgs.filter(m => m.role === 'assistant');
+  const target = assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1] : msgs[msgs.length - 1];
+  
+  const images = target.element ? await extractImagesFromElement(target.element) : [];
   return {
-    index,
-    role,
-    text,
-    codeBlocks,
+    role: target.role,
+    text: target.text,
     images
   };
 }
 
 async function getChatHistory() {
-  const turns = getAllTurnElements();
+  const msgs = extractAllMessagesFromDOM();
   const history = [];
 
-  for (let i = 0; i < turns.length; i++) {
-    const parsed = await parseTurn(turns[i], i);
-    if (parsed.text || parsed.images.length > 0) {
-      history.push(parsed);
-    }
+  for (const m of msgs) {
+    const images = m.element ? await extractImagesFromElement(m.element) : [];
+    history.push({
+      index: m.index,
+      role: m.role,
+      text: m.text,
+      images
+    });
   }
 
   return history;
 }
 
-async function getLastMessage() {
-  const turns = getAllTurnElements();
-  if (turns.length === 0) {
-    return { role: 'assistant', text: '', images: [] };
-  }
-
-  const lastTurn = turns[turns.length - 1];
-  return await parseTurn(lastTurn, turns.length - 1);
-}
-
 // -------------------------------------------------------------
-// 4. Detecção Precisa de Conclusão da Mensagem
+// 4. Detecção Rápida e Confiável de Fim de Geração
 // -------------------------------------------------------------
-function waitForGenerationComplete(timeoutMs = 180000) {
+function waitForGenerationComplete(timeoutMs = 120000) {
   return new Promise((resolve) => {
     const startTime = Date.now();
-    let hasStarted = false;
-    let initialTurns = getAllTurnElements().length;
-    let lastSeenText = '';
-    let stableCount = 0;
+    let hasSeenStopButton = false;
+    let lastText = '';
+    let stableChecks = 0;
 
     const interval = setInterval(async () => {
       const now = Date.now();
       const stopBtn = getStopButton();
       const isStreaming = !!document.querySelector('.result-streaming');
-      const currentTurns = getAllTurnElements().length;
 
-      // 1. Detectar início
-      if (!hasStarted) {
-        if (stopBtn || isStreaming || currentTurns > initialTurns) {
-          hasStarted = true;
-          console.log('[ChatGPT Automator] Geração iniciada detectada.');
-        } else if (now - startTime > 8000) {
-          hasStarted = true;
-        }
+      if (stopBtn || isStreaming) {
+        hasSeenStopButton = true;
       }
 
-      // 2. Aguardar conclusão
-      if (hasStarted) {
-        const turns = getAllTurnElements();
-        const currentText = turns.length > 0 ? turns[turns.length - 1].innerText : '';
-        const isStopGone = !stopBtn && !isStreaming;
+      const lastMsg = await getLastMessage();
+      const currentText = lastMsg.text || '';
 
-        if (currentText === lastSeenText && currentText.length > 0) {
-          stableCount++;
-        } else {
-          stableCount = 0;
-          lastSeenText = currentText;
-        }
-
-        const isStable = stableCount >= 2;
-        const isTimeout = now - startTime > timeoutMs;
-
-        if ((isStopGone && isStable) || isTimeout) {
-          clearInterval(interval);
-          console.log('[ChatGPT Automator] Geração finalizada!');
-          await new Promise(r => setTimeout(r, 600));
-
-          const lastMsg = await getLastMessage();
-          resolve({
-            success: true,
-            response: lastMsg.text,
-            codeBlocks: lastMsg.codeBlocks || [],
-            images: lastMsg.images || []
-          });
-        }
+      if (currentText && currentText === lastText) {
+        stableChecks++;
+      } else {
+        stableChecks = 0;
+        lastText = currentText;
       }
-    }, 700);
+
+      // Concluído se:
+      // - O stop-button não existe E o texto estabilizou por 1 segundo (2 verificações de 500ms)
+      // - OU atingiu timeout
+      const isFinished = !stopBtn && !isStreaming && (hasSeenStopButton || stableChecks >= 2);
+      const isTimeout = now - startTime > timeoutMs;
+
+      if ((isFinished && currentText.length > 0) || isTimeout) {
+        clearInterval(interval);
+        console.log('[ChatGPT Automator] Resposta capturada:', currentText);
+        resolve({
+          success: true,
+          response: currentText,
+          images: lastMsg.images || []
+        });
+      }
+    }, 500);
   });
 }
 
 // -------------------------------------------------------------
-// 5. Listener de Mensagens da Extensão
+// 5. Listener de Mensagens
 // -------------------------------------------------------------
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'check_status') {
     const prompt = getPromptElement();
     const isGenerating = !!getStopButton();
-    const turnsCount = getAllTurnElements().length;
+    const turnsCount = extractAllMessagesFromDOM().length;
     sendResponse({
       ready: !!prompt,
       isGenerating,
@@ -315,39 +319,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request.action === 'get_images') {
-    extractImagesFromElement(document.body)
-      .then(images => sendResponse({ success: true, images }))
-      .catch(err => sendResponse({ success: false, error: err.message }));
-    return true;
-  }
-
-  if (request.action === 'stop_generating') {
-    const stopBtn = getStopButton();
-    if (stopBtn) {
-      stopBtn.click();
-      sendResponse({ success: true, message: 'Geração interrompida' });
-    } else {
-      sendResponse({ success: false, message: 'Nenhuma geração em andamento' });
-    }
-    return true;
-  }
-
-  if (request.action === 'new_chat') {
-    window.location.href = 'https://chatgpt.com/';
-    sendResponse({ success: true });
-    return true;
-  }
-
   if (request.action === 'send') {
     (async () => {
       try {
-        if (getStopButton()) {
-          console.log('[ChatGPT Automator] Aguardando término da geração anterior...');
-          await waitForGenerationComplete(60000);
-          await new Promise(r => setTimeout(r, 1000));
-        }
-
         if (request.files && request.files.length > 0) {
           await attachFiles(request.files);
         }
@@ -356,7 +330,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           setPromptText(request.text);
         }
 
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 500));
 
         const sendBtn = getSendButton();
         if (!sendBtn || sendBtn.disabled) {
@@ -370,13 +344,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               bubbles: true
             }));
           } else {
-            throw new Error('Botão de envio desabilitado.');
+            throw new Error('Botão de envio indisponível.');
           }
         } else {
           sendBtn.click();
         }
 
-        const result = await waitForGenerationComplete(180000);
+        // Aguarda 1.5s antes de começar a checar o fim
+        await new Promise(r => setTimeout(r, 1500));
+        const result = await waitForGenerationComplete(90000);
         sendResponse(result);
 
       } catch (err) {
