@@ -1,13 +1,14 @@
-# Dependências
+# dependencias
 node_modules/
 
-# Dados de perfil e sessões do navegador
-browser_data/
+# downloads locais de teste
+downloads/
 
-# Screenshots de teste
+# sessoes e dados temporarios do navegador
+browser_data/
 screenshot.png
 
-# Chaves e credenciais
+# credenciais e chaves
 deploy_key
 deploy_key.pub
 *.key
@@ -15,11 +16,10 @@ deploy_key.pub
 *.env
 .env*
 
-# Logs
+# logs
 *.log
 npm-debug.log*
 
-# Sistema
+# os
 .DS_Store
 Thumbs.db
-
