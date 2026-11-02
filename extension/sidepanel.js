@@ -127,6 +127,15 @@ async function handleBridgeTask(task) {
     return;
   }
 
+  // Tipo: Novo chat
+  if (task.type === 'new_chat') {
+    logAgent(`Solicitação de abertura de novo chat.`);
+    chrome.tabs.sendMessage(tabId, { action: 'new_chat' }, async (resp) => {
+      await sendBridgeResponse(task.id, resp || { success: true });
+    });
+    return;
+  }
+
   // Tipo: Ler histórico
   if (task.type === 'get_history') {
     logAgent(`Solicitação de leitura do histórico do chat.`);

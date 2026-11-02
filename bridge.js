@@ -282,6 +282,38 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 7. Abrir novo chat
+  if (url.pathname === '/new-chat' && (req.method === 'POST' || req.method === 'GET')) {
+    const taskId = 'newchat_' + Date.now();
+    const task = { id: taskId, type: 'new_chat' };
+
+    const promise = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pendingResolvers.delete(taskId);
+        resolve({ success: true, message: 'Novo chat solicitado' });
+      }, 10000);
+
+      pendingResolvers.set(taskId, (res) => {
+        clearTimeout(timer);
+        resolve(res);
+      });
+    });
+
+    taskQueue.push(task);
+    console.log('[Bridge] Solicitação de novo chat enfileirada.');
+
+    promise
+      .then(result => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result, null, 2));
+      })
+      .catch(err => {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      });
+    return;
+  }
+
   // Status
   if (url.pathname === '/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -78,6 +78,14 @@ async function main() {
       return;
     }
 
+    // Comando: Abrir novo chat
+    if (args[0] === '--new' || args[0] === '--reset') {
+      console.log('Solicitando abertura de novo chat no ChatGPT...');
+      const res = await makeRequest('/new-chat', 'POST', {});
+      console.log(res.message || 'Novo chat iniciado.');
+      return;
+    }
+
     // Comando: Ler última mensagem
     if (args[0] === '--last') {
       console.log('Lendo última mensagem do ChatGPT...');

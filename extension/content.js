@@ -219,7 +219,7 @@ async function getLastAssistantTurn() {
 // -------------------------------------------------------------
 // 4. Detecção Ultra-Precisa de Conclusão da Imagem Atual
 // -------------------------------------------------------------
-function waitForGenerationComplete(preExistingImgUrls = new Set(), timeoutMs = 120000) {
+function waitForGenerationComplete(preExistingImgUrls = new Set(), timeoutMs = 300000) {
   return new Promise((resolve) => {
     const startTime = Date.now();
     let hasSeenStop = false;
@@ -283,6 +283,45 @@ function waitForGenerationComplete(preExistingImgUrls = new Set(), timeoutMs = 1
 // 5. Listener de Mensagens da Extensão
 // -------------------------------------------------------------
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Novo chat
+  if (request.action === 'new_chat') {
+    // 1. Tentar clicar no botão nativo "Novo chat"
+    const newChatBtn = (
+      document.querySelector('a[href="/"]') ||
+      document.querySelector('button[aria-label*="Novo chat"]') ||
+      document.querySelector('button[aria-label*="New chat"]') ||
+      document.querySelector('[data-testid="new-chat-button"]')
+    );
+
+    if (newChatBtn) {
+      newChatBtn.click();
+      sendResponse({ success: true, message: 'Novo chat aberto via clique' });
+    } else {
+      // 2. Fallback: navegar diretamente para a raiz do chatgpt
+      window.location.href = 'https://chatgpt.com/';
+      sendResponse({ success: true, message: 'Novo chat aberto via navegacao' });
+    }
+    return true;
+  }
+  // Novo chat
+  if (request.action === 'new_chat') {
+    const newChatBtn = (
+      document.querySelector('[data-testid="create-new-chat-button"]') ||
+      document.querySelector('a[href="/"]') ||
+      document.querySelector('a[aria-label*="Novo"]') ||
+      document.querySelector('a[aria-label*="New"]') ||
+      document.querySelector('button[aria-label*="Novo"]') ||
+      document.querySelector('button[aria-label*="New"]')
+    );
+    if (newChatBtn) {
+      newChatBtn.click();
+    } else {
+      window.location.href = 'https://chatgpt.com/';
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+
   // Baixar a ÚLTIMA imagem gerada na conversa
   if (request.action === 'get_images') {
     const assistantImgs = getAllAssistantImages();
@@ -343,7 +382,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         await new Promise(r => setTimeout(r, 1500));
-        const result = await waitForGenerationComplete(preExistingImgUrls, 120000);
+        const result = await waitForGenerationComplete(preExistingImgUrls, 300000);
         sendResponse(result);
 
       } catch (err) {
