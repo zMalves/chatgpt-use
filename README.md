@@ -108,6 +108,12 @@ node ask.js "Gere uma imagem de um carro futurista no deserto."
 ```
 *A imagem será baixada automaticamente em alta resolução para a pasta `downloads/`.*
 
+#### 🔄 Abrir um Novo Chat (Resetar Conversa)
+Inicia uma nova conversa em branco instantaneamente:
+```bash
+node ask.js --new
+```
+
 #### 📖 Ler o Histórico Completo do Chat
 ```bash
 node ask.js --history
