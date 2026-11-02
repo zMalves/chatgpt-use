@@ -1,4 +1,4 @@
-// ChatGPT Automator - Content Script v1.6.0
+// ChatGPT Automator - Content Script v1.7.0
 console.log('[ChatGPT Automator] Content script carregado no ChatGPT.');
 
 // -------------------------------------------------------------
@@ -75,7 +75,7 @@ async function attachFiles(filesData) {
 }
 
 // -------------------------------------------------------------
-// 2. Extração Precisa de Imagens Geradas (DALL-E)
+// 2. Extração Precisa de Imagens
 // -------------------------------------------------------------
 async function convertBlobOrUrlToBase64(src) {
   try {
@@ -92,14 +92,14 @@ async function convertBlobOrUrlToBase64(src) {
   }
 }
 
-async function extractAllGeneratedImages() {
-  const imgs = Array.from(document.querySelectorAll('img'));
+async function extractImagesFromContainer(container) {
+  const imgs = Array.from(container.querySelectorAll('img'));
   const contentImages = [];
 
   for (let i = 0; i < imgs.length; i++) {
     const img = imgs[i];
 
-    // Ignorar avatares do ChatGPT / Usuário
+    // Ignorar avatares
     const isAvatar = (
       img.classList.contains('rounded-full') ||
       img.closest('[data-testid="user-avatar"]') ||
@@ -110,19 +110,17 @@ async function extractAllGeneratedImages() {
 
     if (isAvatar || !img.src) continue;
 
-    // Verificar se é uma imagem de conteúdo (tem largura razoável ou botão de editar)
     const isGenerated = (
       img.src.includes('oaiusercontent.com') ||
       img.src.startsWith('blob:') ||
       img.naturalWidth > 150 ||
       img.width > 150 ||
       img.closest('[data-testid*="image"]') ||
-      img.parentElement?.querySelector('button') // botões de Editar / Download
+      img.parentElement?.querySelector('button')
     );
 
     if (!isGenerated) continue;
 
-    // Aguardar terminar de carregar se necessário
     if (!img.complete) {
       await new Promise(res => {
         img.onload = res;
@@ -157,6 +155,23 @@ async function extractAllGeneratedImages() {
   return contentImages;
 }
 
+function getAllGeneratedImageElements() {
+  const imgs = Array.from(document.querySelectorAll('img'));
+  return imgs.filter(img => {
+    const isAvatar = (
+      img.classList.contains('rounded-full') ||
+      img.closest('[data-testid="user-avatar"]') ||
+      (img.naturalWidth > 0 && img.naturalWidth <= 50)
+    );
+    return !isAvatar && (
+      img.src.includes('oaiusercontent.com') ||
+      img.src.startsWith('blob:') ||
+      img.naturalWidth > 150 ||
+      img.width > 150
+    );
+  });
+}
+
 // -------------------------------------------------------------
 // 3. Extração de Mensagens
 // -------------------------------------------------------------
@@ -174,56 +189,42 @@ function cleanElementText(element) {
   return text.trim();
 }
 
-function getAllTurns() {
-  const turns = [];
+function getAllTurnContainers() {
   const articles = Array.from(document.querySelectorAll('article'));
-  if (articles.length > 0) {
-    articles.forEach((art, idx) => {
-      const isUser = !!(
-        art.querySelector('[data-message-author-role="user"]') ||
-        art.getAttribute('data-testid')?.includes('user') ||
-        art.innerText.includes('Você disse:')
-      );
-      const role = isUser ? 'user' : 'assistant';
-      const text = cleanElementText(art);
-      turns.push({ index: idx, role, text, element: art });
-    });
-    return turns;
-  }
+  if (articles.length > 0) return articles;
 
   const markdowns = Array.from(document.querySelectorAll('.markdown'));
-  markdowns.forEach((m, idx) => {
-    const text = cleanElementText(m);
-    if (text) {
-      turns.push({ index: idx, role: 'assistant', text, element: m });
-    }
-  });
+  if (markdowns.length > 0) return markdowns;
 
-  return turns;
+  return [];
 }
 
-async function getLastMessage() {
-  const turns = getAllTurns();
-  const allImages = await extractAllGeneratedImages();
-
-  if (turns.length === 0) {
-    return { role: 'assistant', text: '', images: allImages };
+async function getLastTurn() {
+  const containers = getAllTurnContainers();
+  if (containers.length === 0) {
+    const allImgs = await extractImagesFromContainer(document.body);
+    return {
+      text: '',
+      images: allImgs.slice(-1), // apenas a mais recente se não houver contêiner
+      element: null
+    };
   }
 
-  const assistants = turns.filter(t => t.role === 'assistant');
-  const target = assistants.length > 0 ? assistants[assistants.length - 1] : turns[turns.length - 1];
+  const lastContainer = containers[containers.length - 1];
+  const text = cleanElementText(lastContainer);
+  const images = await extractImagesFromContainer(lastContainer);
 
   return {
-    role: target.role,
-    text: target.text,
-    images: allImages
+    text,
+    images,
+    element: lastContainer
   };
 }
 
 // -------------------------------------------------------------
-// 4. Detecção de Término
+// 4. Detecção Precisa de Término (Novo Turno / Nova Imagem)
 // -------------------------------------------------------------
-function waitForGenerationComplete(timeoutMs = 90000) {
+function waitForGenerationComplete(preExistingImgUrls = new Set(), timeoutMs = 90000) {
   return new Promise((resolve) => {
     const startTime = Date.now();
     let hasSeenStop = false;
@@ -239,9 +240,23 @@ function waitForGenerationComplete(timeoutMs = 90000) {
         hasSeenStop = true;
       }
 
-      const lastMsg = await getLastMessage();
-      const currentText = lastMsg.text || '';
-      const hasImages = (lastMsg.images || []).length > 0;
+      // 1. Verificar imagens no último turno
+      const lastTurn = await getLastTurn();
+      const currentText = lastTurn.text || '';
+
+      // 2. Verificar se surgiu alguma NOVA imagem na página
+      const allCurrentImgs = getAllGeneratedImageElements();
+      const newImgs = allCurrentImgs.filter(img => !preExistingImgUrls.has(img.src));
+
+      let newlyGeneratedImages = [];
+      if (newImgs.length > 0) {
+        // Encontrou nova imagem gerada nesta mensagem!
+        const lastNewImg = newImgs[newImgs.length - 1];
+        if (lastNewImg.complete) {
+          const extracted = await extractImagesFromContainer(lastNewImg.parentElement || document.body);
+          newlyGeneratedImages = extracted.filter(img => !preExistingImgUrls.has(img.url));
+        }
+      }
 
       if (currentText && currentText === lastText) {
         stableTicks++;
@@ -250,19 +265,21 @@ function waitForGenerationComplete(timeoutMs = 90000) {
         lastText = currentText;
       }
 
-      const isDone = !stopBtn && !isStreaming && (hasSeenStop || stableTicks >= 2 || hasImages);
+      const hasNewImageReady = newlyGeneratedImages.length > 0;
+      const isTextDone = !stopBtn && !isStreaming && (hasSeenStop || stableTicks >= 2);
       const isTimeout = now - startTime > timeoutMs;
 
-      if ((isDone && (currentText.length > 0 || hasImages)) || isTimeout) {
+      if ((hasNewImageReady && !stopBtn) || (isTextDone && currentText.length > 0) || isTimeout) {
         clearInterval(interval);
-        console.log('[ChatGPT Automator] Geração finalizada! Imagens encontradas:', lastMsg.images.length);
+        console.log('[ChatGPT Automator] Geração finalizada! Novas imagens:', newlyGeneratedImages.length);
+
         resolve({
           success: true,
           response: currentText || 'Imagem gerada com sucesso!',
-          images: lastMsg.images || []
+          images: hasNewImageReady ? newlyGeneratedImages : lastTurn.images
         });
       }
-    }, 500);
+    }, 600);
   });
 }
 
@@ -271,33 +288,37 @@ function waitForGenerationComplete(timeoutMs = 90000) {
 // -------------------------------------------------------------
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'get_images') {
-    extractAllGeneratedImages()
+    extractImagesFromContainer(document.body)
       .then(images => sendResponse({ success: true, images }))
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true;
   }
 
   if (request.action === 'get_last_message') {
-    getLastMessage()
-      .then(lastMessage => sendResponse({ success: true, lastMessage }))
+    getLastTurn()
+      .then(last => sendResponse({ success: true, lastMessage: { role: 'assistant', text: last.text, images: last.images } }))
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true;
   }
 
   if (request.action === 'get_history') {
-    const turns = getAllTurns();
-    extractAllGeneratedImages().then(images => {
-      sendResponse({
-        success: true,
-        history: turns.map(t => ({ ...t, images }))
-      });
-    });
+    const containers = getAllTurnContainers();
+    Promise.all(containers.map(async (c, idx) => ({
+      index: idx,
+      role: 'assistant',
+      text: cleanElementText(c),
+      images: await extractImagesFromContainer(c)
+    }))).then(history => sendResponse({ success: true, history }));
     return true;
   }
 
   if (request.action === 'send') {
     (async () => {
       try {
+        // Mapear imagens existentes ANTES de enviar o novo prompt
+        const existingImgs = getAllGeneratedImageElements();
+        const preExistingImgUrls = new Set(existingImgs.map(i => i.src));
+
         if (request.files && request.files.length > 0) {
           await attachFiles(request.files);
         }
@@ -327,7 +348,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         await new Promise(r => setTimeout(r, 1500));
-        const result = await waitForGenerationComplete(90000);
+        // Passa o conjunto de URLs anteriores para filtrar APENAS a imagem recém-gerada
+        const result = await waitForGenerationComplete(preExistingImgUrls, 90000);
         sendResponse(result);
 
       } catch (err) {

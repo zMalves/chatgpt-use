@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Automator & Assistant",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Controla o ChatGPT pelo Side Panel: fila de mensagens sequenciais, detecção precisa de fim de geração, leitura de histórico e download de imagens.",
   "permissions": [
     "activeTab",
