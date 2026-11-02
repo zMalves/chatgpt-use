@@ -1,4 +1,4 @@
-// ChatGPT Automator - Content Script v1.4.0
+// ChatGPT Automator - Content Script v1.5.0
 console.log('[ChatGPT Automator] Content script carregado no ChatGPT.');
 
 // -------------------------------------------------------------
@@ -143,77 +143,90 @@ async function extractImagesFromElement(rootElement) {
 }
 
 // -------------------------------------------------------------
-// 3. Leitura Robusta e Flexível do Chat
+// 3. Extração Precisa de Texto das Mensagens
 // -------------------------------------------------------------
-function extractAllMessagesFromDOM() {
-  const results = [];
+function cleanElementText(element) {
+  if (!element) return '';
 
-  // 1. Procurar por artigos
+  // 1. Tentar elementos específicos de markdown / texto
+  const textContainer = (
+    element.querySelector('.markdown') ||
+    element.querySelector('[data-message-author-role]') ||
+    element.querySelector('.whitespace-pre-wrap') ||
+    element
+  );
+
+  let text = textContainer.innerText || textContainer.textContent || '';
+  
+  // Limpar botões de rodapé comuns (Copiar, Regenerar, etc.)
+  text = text.replace(/^(Você disse|ChatGPT disse|ChatGPT):\s*/i, '');
+  return text.trim();
+}
+
+function getAllTurns() {
+  const turns = [];
+
+  // 1. Abordagem principal: data-message-author-role
+  const roleElements = Array.from(document.querySelectorAll('[data-message-author-role]'));
+  if (roleElements.length > 0) {
+    roleElements.forEach((el, idx) => {
+      const role = el.getAttribute('data-message-author-role') || 'assistant';
+      const text = cleanElementText(el);
+      if (text) {
+        turns.push({ index: idx, role, text, element: el });
+      }
+    });
+    if (turns.length > 0) return turns;
+  }
+
+  // 2. Abordagem por artigos de conversa
   const articles = Array.from(document.querySelectorAll('article'));
   if (articles.length > 0) {
-    for (let i = 0; i < articles.length; i++) {
-      const art = articles[i];
-      const text = art.innerText.trim();
-      if (!text) continue;
-
+    articles.forEach((art, idx) => {
       const isUser = !!(
         art.querySelector('[data-message-author-role="user"]') ||
         art.getAttribute('data-testid')?.includes('user') ||
-        text.startsWith('Você disse:')
+        art.innerText.includes('Você disse:')
       );
-
-      results.push({
-        index: i,
-        role: isUser ? 'user' : 'assistant',
-        text: text.replace(/^Você disse:\s*/i, '').replace(/^ChatGPT disse:\s*/i, '').trim(),
-        element: art
-      });
-    }
-    if (results.length > 0) return results;
+      const role = isUser ? 'user' : 'assistant';
+      const text = cleanElementText(art);
+      if (text) {
+        turns.push({ index: idx, role, text, element: art });
+      }
+    });
+    if (turns.length > 0) return turns;
   }
 
-  // 2. Fallback: procurar por elementos com markdown
+  // 3. Abordagem por blocos de markdown
   const markdowns = Array.from(document.querySelectorAll('.markdown'));
-  if (markdowns.length > 0) {
-    for (let i = 0; i < markdowns.length; i++) {
-      results.push({
-        index: i,
-        role: 'assistant',
-        text: markdowns[i].innerText.trim(),
-        element: markdowns[i]
-      });
+  markdowns.forEach((m, idx) => {
+    const text = cleanElementText(m);
+    if (text) {
+      turns.push({ index: idx, role: 'assistant', text, element: m });
     }
-    return results;
-  }
+  });
 
-  // 3. Fallback extremo: pegar o container principal de conversa
-  const main = document.querySelector('main');
-  if (main) {
-    const pTags = Array.from(main.querySelectorAll('p'));
-    if (pTags.length > 0) {
-      const lastP = pTags[pTags.length - 1];
-      results.push({
-        index: 0,
-        role: 'assistant',
-        text: lastP.innerText.trim(),
-        element: lastP
-      });
-    }
-  }
-
-  return results;
+  return turns;
 }
 
 async function getLastMessage() {
-  const msgs = extractAllMessagesFromDOM();
-  if (msgs.length === 0) {
+  const turns = getAllTurns();
+  if (turns.length === 0) {
+    // Última tentativa: buscar todo texto dentro de main ignorando cabeçalhos e prompt
+    const main = document.querySelector('main');
+    if (main) {
+      const paragraphs = Array.from(main.querySelectorAll('p, li, pre'));
+      const validText = paragraphs.map(p => p.innerText.trim()).filter(t => t.length > 0).join('\n');
+      if (validText) {
+        return { role: 'assistant', text: validText, images: [] };
+      }
+    }
     return { role: 'assistant', text: '', images: [] };
   }
 
-  // Encontrar a última mensagem do assistente
-  const assistantMsgs = msgs.filter(m => m.role === 'assistant');
-  const target = assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1] : msgs[msgs.length - 1];
-  
+  const assistants = turns.filter(t => t.role === 'assistant');
+  const target = assistants.length > 0 ? assistants[assistants.length - 1] : turns[turns.length - 1];
+
   const images = target.element ? await extractImagesFromElement(target.element) : [];
   return {
     role: target.role,
@@ -223,15 +236,15 @@ async function getLastMessage() {
 }
 
 async function getChatHistory() {
-  const msgs = extractAllMessagesFromDOM();
+  const turns = getAllTurns();
   const history = [];
 
-  for (const m of msgs) {
-    const images = m.element ? await extractImagesFromElement(m.element) : [];
+  for (const t of turns) {
+    const images = t.element ? await extractImagesFromElement(t.element) : [];
     history.push({
-      index: m.index,
-      role: m.role,
-      text: m.text,
+      index: t.index,
+      role: t.role,
+      text: t.text,
       images
     });
   }
@@ -240,14 +253,14 @@ async function getChatHistory() {
 }
 
 // -------------------------------------------------------------
-// 4. Detecção Rápida e Confiável de Fim de Geração
+// 4. Detecção Rápida de Conclusão da Mensagem
 // -------------------------------------------------------------
-function waitForGenerationComplete(timeoutMs = 120000) {
+function waitForGenerationComplete(timeoutMs = 90000) {
   return new Promise((resolve) => {
     const startTime = Date.now();
-    let hasSeenStopButton = false;
+    let hasSeenStop = false;
     let lastText = '';
-    let stableChecks = 0;
+    let stableTicks = 0;
 
     const interval = setInterval(async () => {
       const now = Date.now();
@@ -255,28 +268,26 @@ function waitForGenerationComplete(timeoutMs = 120000) {
       const isStreaming = !!document.querySelector('.result-streaming');
 
       if (stopBtn || isStreaming) {
-        hasSeenStopButton = true;
+        hasSeenStop = true;
       }
 
       const lastMsg = await getLastMessage();
       const currentText = lastMsg.text || '';
 
       if (currentText && currentText === lastText) {
-        stableChecks++;
+        stableTicks++;
       } else {
-        stableChecks = 0;
+        stableTicks = 0;
         lastText = currentText;
       }
 
-      // Concluído se:
-      // - O stop-button não existe E o texto estabilizou por 1 segundo (2 verificações de 500ms)
-      // - OU atingiu timeout
-      const isFinished = !stopBtn && !isStreaming && (hasSeenStopButton || stableChecks >= 2);
+      // Finalizado quando o stop sumir e o texto estiver estável
+      const isDone = !stopBtn && !isStreaming && (hasSeenStop || stableTicks >= 2);
       const isTimeout = now - startTime > timeoutMs;
 
-      if ((isFinished && currentText.length > 0) || isTimeout) {
+      if ((isDone && currentText.length > 0) || isTimeout) {
         clearInterval(interval);
-        console.log('[ChatGPT Automator] Resposta capturada:', currentText);
+        console.log('[ChatGPT Automator] Resposta final capturada:', currentText);
         resolve({
           success: true,
           response: currentText,
@@ -294,11 +305,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'check_status') {
     const prompt = getPromptElement();
     const isGenerating = !!getStopButton();
-    const turnsCount = extractAllMessagesFromDOM().length;
+    const turns = getAllTurns();
     sendResponse({
       ready: !!prompt,
       isGenerating,
-      turnsCount,
+      turnsCount: turns.length,
       url: window.location.href,
       title: document.title
     });
@@ -350,7 +361,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendBtn.click();
         }
 
-        // Aguarda 1.5s antes de começar a checar o fim
         await new Promise(r => setTimeout(r, 1500));
         const result = await waitForGenerationComplete(90000);
         sendResponse(result);
