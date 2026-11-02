@@ -129,10 +129,20 @@ async function handleBridgeTask(task) {
 
   // Tipo: Novo chat
   if (task.type === 'new_chat') {
-    logAgent(`Solicitação de abertura de novo chat.`);
-    chrome.tabs.sendMessage(tabId, { action: 'new_chat' }, async (resp) => {
-      await sendBridgeResponse(task.id, resp || { success: true });
-    });
+    logAgent(`Abrindo novo chat no ChatGPT...`);
+    try {
+      // 1. Tentar acionar diretamente via API de abas para garantir navegação real
+      await chrome.tabs.update(tabId, { url: 'https://chatgpt.com/' });
+      
+      // 2. Notificar content script também
+      chrome.tabs.sendMessage(tabId, { action: 'new_chat' }, () => {});
+
+      logAgent(`✅ Novo chat aberto com sucesso!`);
+      await sendBridgeResponse(task.id, { success: true, message: 'Novo chat aberto com sucesso!' });
+    } catch (e) {
+      logAgent(`Erro ao abrir novo chat: ${e.message}`);
+      await sendBridgeResponse(task.id, { success: false, error: e.message });
+    }
     return;
   }
 
@@ -501,6 +511,7 @@ stopBtn.addEventListener('click', async () => {
 newChatBtn.addEventListener('click', async () => {
   const tabId = await findChatGPTTab();
   if (tabId) {
+    chrome.tabs.update(tabId, { url: 'https://chatgpt.com/' });
     chrome.tabs.sendMessage(tabId, { action: 'new_chat' });
   }
 });

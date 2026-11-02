@@ -285,22 +285,25 @@ function waitForGenerationComplete(preExistingImgUrls = new Set(), timeoutMs = 3
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Novo chat
   if (request.action === 'new_chat') {
-    // 1. Tentar clicar no botão nativo "Novo chat"
+    // 1. Tentar clicar no botão nativo "Novo chat" ou barra lateral
     const newChatBtn = (
       document.querySelector('a[href="/"]') ||
       document.querySelector('button[aria-label*="Novo chat"]') ||
       document.querySelector('button[aria-label*="New chat"]') ||
+      document.querySelector('nav a[href="/"]') ||
       document.querySelector('[data-testid="new-chat-button"]')
     );
 
     if (newChatBtn) {
       newChatBtn.click();
-      sendResponse({ success: true, message: 'Novo chat aberto via clique' });
-    } else {
-      // 2. Fallback: navegar diretamente para a raiz do chatgpt
-      window.location.href = 'https://chatgpt.com/';
-      sendResponse({ success: true, message: 'Novo chat aberto via navegacao' });
     }
+    
+    // Forçar navegação para a raiz se a URL ainda estiver em um chat específico
+    if (window.location.pathname !== '/' && !window.location.pathname.endsWith('/')) {
+      window.location.href = 'https://chatgpt.com/';
+    }
+
+    sendResponse({ success: true, message: 'Novo chat aberto com sucesso' });
     return true;
   }
   // Novo chat
