@@ -1,0 +1,24 @@
+# Dependências
+node_modules/
+
+# Dados de perfil e sessões do navegador
+browser_data/
+
+# Screenshots de teste
+screenshot.png
+
+# Chaves e credenciais
+deploy_key
+deploy_key.pub
+*.key
+*.pem
+*.env
+.env*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store
+Thumbs.db
