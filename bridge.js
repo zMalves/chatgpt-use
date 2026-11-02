@@ -109,8 +109,8 @@ const server = http.createServer((req, res) => {
         const promise = new Promise((resolve, reject) => {
           const timer = setTimeout(() => {
             pendingResolvers.delete(taskId);
-            reject(new Error('Tempo limite esgotado aguardando resposta do ChatGPT (180s)'));
-          }, 180000);
+            reject(new Error('Tempo limite esgotado aguardando resposta do ChatGPT (360s)'));
+          }, 360000);
 
           pendingResolvers.set(taskId, (result) => {
             clearTimeout(timer);
@@ -173,8 +173,8 @@ const server = http.createServer((req, res) => {
           const promise = new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
               pendingResolvers.delete(taskId);
-              reject(new Error(`Timeout na mensagem ${i + 1}/${prompts.length}`));
-            }, 180000);
+              reject(new Error(`Timeout na mensagem ${i + 1}/${prompts.length} (360s)`));
+            }, 360000);
 
             pendingResolvers.set(taskId, (res) => {
               clearTimeout(timer);
