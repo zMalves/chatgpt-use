@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>ChatGPT Side Panel</title>
+  <style>
+    :root {
+      --bg: #18181b;
+      --card-bg: #27272a;
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --accent: #10a37f;
+      --accent-hover: #0e8d6e;
+      --border: #3f3f46;
+      --danger: #ef4444;
+      --blue: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      padding: 14px;
+      font-size: 13px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .status-badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-online {
+      background: rgba(16, 163, 127, 0.2);
+      color: #34d399;
+    }
+
+    .status-offline {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    .status-blue {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .field-group {
+      margin-bottom: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 75px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 13px;
+      resize: vertical;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .file-drop-area {
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      text-align: center;
+      background: var(--card-bg);
+      cursor: pointer;
+      transition: border 0.2s;
+    }
+
+    .file-drop-area:hover {
+      border-color: var(--accent);
+    }
+
+    .file-drop-area span {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    #fileList {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 60px;
+      overflow-y: auto;
+    }
+
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #2e2e35;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .file-remove {
+      color: var(--danger);
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-weight: 500;
+      font-size: 12px;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      flex: 1;
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background: #3f3f46;
+      color: var(--text);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #52525b;
+    }
+
+    /* Logs & Atividades do Agente */
+    .agent-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+
+    .agent-log {
+      font-family: monospace;
+      font-size: 11px;
+      color: #93c5fd;
+      background: #18181b;
+      padding: 6px 8px;
+      border-radius: 4px;
+      max-height: 80px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    .response-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      min-height: 120px;
+    }
+
+    .response-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .response-content {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #e4e4e7;
+    }
+
+    .copy-btn {
+      background: transparent;
+      color: var(--accent);
+      padding: 2px 6px;
+      font-size: 11px;
+    }
+
+    .copy-btn:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-title-row">
+      <h1>ChatGPT Assistant</h1>
+    </div>
+    <div class="status-tags">
+      <div id="chatgptStatus" class="status-badge status-offline">
+        <span class="status-dot"></span>
+        <span id="chatgptStatusText">Verificando ChatGPT...</span>
+      </div>
+      <div id="bridgeStatus" class="status-badge status-blue">
+        <span class="status-dot"></span>
+        <span id="bridgeStatusText">Bridge: Conectando...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Atividades do Agente (CLI / Background) -->
+  <div class="agent-box">
+    <div class="section-title">Comunicação Direta com o Agente:</div>
+    <div id="agentLog" class="agent-log">Pronto para receber comandos automáticos via Bridge (porta 4321)...</div>
+  </div>
+
+  <!-- Envio Manual / Controle -->
+  <div class="field-group">
+    <label class="section-title">Enviar Mensagem / Arquivos:</label>
+    <textarea id="promptInput" placeholder="Digite uma instrução ou pergunta para o ChatGPT..."></textarea>
+  </div>
+
+  <div class="field-group">
+    <div class="file-drop-area" id="dropArea">
+      <span>📎 Clique para adicionar arquivos (PDF, imagens, docs...)</span>
+      <input type="file" id="fileInput" multiple style="display: none;">
+    </div>
+    <div id="fileList"></div>
+  </div>
+
+  <div class="btn-row">
+    <button id="sendBtn" class="btn-primary" disabled>Enviar Mensagem</button>
+    <button id="newChatBtn" class="btn-secondary" title="Nova Conversa">Novo Chat</button>
+  </div>
+
+  <!-- Resposta do ChatGPT -->
+  <div class="response-card">
+    <div class="response-header">
+      <span class="section-title">Última Resposta:</span>
+      <button id="copyBtn" class="copy-btn">Copiar</button>
+    </div>
+    <div id="responseContent" class="response-content">Nenhuma resposta capturada ainda.</div>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

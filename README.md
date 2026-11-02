@@ -1,51 +1,54 @@
-# ChatGPT Use - Browser Extension & Automator
+# ChatGPT Use - Side Panel & Assistant Bridge
 
-Extensão para Google Chrome e Microsoft Edge (Manifest V3) que permite controlar o ChatGPT, enviar mensagens, anexar arquivos automaticamente e capturar respostas diretamente pelo navegador.
+Extensão para Google Chrome e Microsoft Edge (Manifest V3) que roda no **painel lateral (Side Panel)** do navegador e se conecta a uma **Bridge Local (porta 4321)**, permitindo que você ou um assistente de IA envie comandos, mensagens e arquivos diretamente para o ChatGPT autenticado.
 
 ---
 
 ## 🚀 Funcionalidades
 
-- **Detecção Automática:** Identifica quando você está com o ChatGPT aberto (`chatgpt.com`).
-- **Envio de Arquivos & Mídia:** Permite anexar múltiplos arquivos (PDFs, imagens, documentos, código, planilhas) e injeta diretamente no input do ChatGPT.
-- **Digitação e Envio Automatizado:** Preenche o prompt simulando digitação humana e dispara o envio.
-- **Captura da Resposta:** Monitora o término da geração da IA e exibe o texto final com botão de cópia com 1 clique.
-- **Ações Rápidas:** Botão para iniciar novo chat (`New Chat`) e atalhos de controle.
+- **Painel Lateral (Side Panel):** Abre fixado ao lado da página de navegação, sem sumir ao clicar fora.
+- **Bridge Local para o Agente:** Servidor HTTP local (`http://127.0.0.1:4321`) que permite enviar comandos via terminal/código (`node ask.js "..."`) diretamente para o ChatGPT.
+- **Upload Automático de Arquivos:** Suporte a PDF, imagens, texto, código e planilhas injetados nativamente no ChatGPT.
+- **Leitura da Resposta:** Extrai a resposta completa da IA e devolve tanto para o painel quanto para o terminal/agente.
+- **Busca de Abas Inteligente:** O painel lateral localiza a aba do ChatGPT automaticamente, mesmo se você estiver navegando em outra aba no momento.
 
 ---
 
-## 📦 Como Instalar a Extensão
+## 📦 Como Recarregar a Extensão no Edge / Chrome
 
-### No Google Chrome:
-1. Abra o Chrome e acesse `chrome://extensions/`.
-2. Ative a opção **"Modo do desenvolvedor"** no canto superior direito.
-3. Clique em **"Carregar sem compactação"** (*Load unpacked*).
-4. Selecione a pasta `extension/` deste repositório.
+Como a extensão foi atualizada para **Side Panel**:
 
-### No Microsoft Edge:
-1. Abra o Edge e acesse `edge://extensions/`.
-2. Ative a opção **"Modo de desenvolvedor"** na coluna lateral ou topo.
-3. Clique em **"Carregar sem pacote"** (*Load unpacked*).
-4. Selecione a pasta `extension/` deste repositório.
+1. Acesse `edge://extensions` (ou o link direto `edge://extensions/?id=ocndemgafoaeocnkgelccliopiiggiij`).
+2. Clique no ícone de **Recarregar (🔄)** no cartão da extensão.
+3. Agora, ao clicar no ícone da extensão na barra de ferramentas, ela abrirá diretamente no **Painel Lateral (Side Panel)** do Edge!
 
 ---
 
-## 🛠️ Estrutura do Projeto
+## 🤖 Como Enviar Comandos para o ChatGPT via Terminal / Agente
 
-```text
-├── extension/
-│   ├── manifest.json      # Configurações do Manifest V3
-│   ├── popup.html         # Interface visual do popup
-│   ├── popup.js           # Lógica do popup e envio de arquivos
-│   ├── content.js         # Script injetado na página do ChatGPT (DOM, upload, envio)
-│   ├── background.js      # Service Worker de segundo plano
-│   └── icons/             # Ícones da extensão
-├── server.js              # Servidor opcional de automação via Playwright
-└── README.md
+Com a extensão aberta no Side Panel e o ChatGPT aberto:
+
+```bash
+# Enviar apenas uma pergunta
+node ask.js "Explique o que é gravidade em 2 frases"
+
+# Enviar com arquivos anexados
+node ask.js "Resuma este documento" ./relatorio.pdf ./dados.csv
 ```
 
 ---
 
-## 📄 Licença
+## 🛠️ Estrutura
 
-MIT
+```text
+├── extension/
+│   ├── manifest.json      # Manifest V3 com permissão sidePanel
+│   ├── sidepanel.html     # Interface do painel lateral
+│   ├── sidepanel.js       # Controle de abas, polling do bridge e uploads
+│   ├── content.js         # Script injetado no ChatGPT
+│   ├── background.js      # Service Worker (ativa sidePanel no clique)
+│   └── icons/             # Ícones
+├── bridge.js              # Servidor HTTP local (porta 4321) que conecta o Agente à Extensão
+├── ask.js                 # CLI para enviar prompts e arquivos
+└── README.md
+```
