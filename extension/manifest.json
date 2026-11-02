@@ -1,18 +1,20 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Automator & Assistant",
-  "version": "1.1.0",
-  "description": "Controla o ChatGPT pelo painel lateral (Side Panel), permitindo envio automático de prompts e arquivos pelo assistente ou manualmente.",
+  "version": "1.2.0",
+  "description": "Controla o ChatGPT pelo Side Panel: fila de mensagens sequenciais, detecção precisa de fim de geração, leitura de histórico e download de imagens.",
   "permissions": [
     "activeTab",
     "tabs",
     "scripting",
     "storage",
-    "sidePanel"
+    "sidePanel",
+    "downloads"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://*.chatgpt.com/*",
+    "https://*.oaiusercontent.com/*",
     "http://127.0.0.1:4321/*"
   ],
   "side_panel": {

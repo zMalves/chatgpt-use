@@ -2,11 +2,12 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>ChatGPT Side Panel</title>
+  <title>ChatGPT Assistant & Automator</title>
   <style>
     :root {
       --bg: #18181b;
       --card-bg: #27272a;
+      --card-alt: #202023;
       --text: #f4f4f5;
       --text-muted: #a1a1aa;
       --accent: #10a37f;
@@ -14,6 +15,7 @@
       --border: #3f3f46;
       --danger: #ef4444;
       --blue: #3b82f6;
+      --purple: #8b5cf6;
     }
 
     * {
@@ -26,7 +28,7 @@
     body {
       background: var(--bg);
       color: var(--text);
-      padding: 14px;
+      padding: 12px;
       font-size: 13px;
       height: 100vh;
       display: flex;
@@ -34,8 +36,8 @@
     }
 
     .header {
-      margin-bottom: 12px;
-      padding-bottom: 10px;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
       border-bottom: 1px solid var(--border);
     }
 
@@ -43,11 +45,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .header h1 {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       display: flex;
       align-items: center;
@@ -62,7 +64,7 @@
 
     .status-badge {
       font-size: 11px;
-      padding: 3px 8px;
+      padding: 2px 8px;
       border-radius: 12px;
       font-weight: 500;
       display: inline-flex;
@@ -92,12 +94,48 @@
       background: currentColor;
     }
 
+    /* Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: var(--card-bg);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .tab-content {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
     .section-title {
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--text-muted);
-      margin-bottom: 6px;
+      margin-bottom: 5px;
       font-weight: 600;
     }
 
@@ -107,13 +145,13 @@
 
     textarea {
       width: 100%;
-      height: 75px;
+      height: 70px;
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
+      border-radius: 6px;
+      padding: 8px;
       color: var(--text);
-      font-size: 13px;
+      font-size: 12px;
       resize: vertical;
       outline: none;
     }
@@ -124,12 +162,11 @@
 
     .file-drop-area {
       border: 1px dashed var(--border);
-      border-radius: 8px;
-      padding: 8px;
+      border-radius: 6px;
+      padding: 7px;
       text-align: center;
       background: var(--card-bg);
       cursor: pointer;
-      transition: border 0.2s;
     }
 
     .file-drop-area:hover {
@@ -142,11 +179,11 @@
     }
 
     #fileList {
-      margin-top: 6px;
+      margin-top: 4px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      max-height: 60px;
+      gap: 3px;
+      max-height: 50px;
       overflow-y: auto;
     }
 
@@ -155,7 +192,7 @@
       justify-content: space-between;
       align-items: center;
       background: #2e2e35;
-      padding: 4px 8px;
+      padding: 3px 6px;
       border-radius: 4px;
       font-size: 11px;
     }
@@ -168,15 +205,15 @@
 
     .btn-row {
       display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
+      gap: 6px;
+      margin-bottom: 8px;
     }
 
     button {
       cursor: pointer;
       border: none;
       border-radius: 6px;
-      padding: 8px 12px;
+      padding: 7px 10px;
       font-weight: 500;
       font-size: 12px;
       transition: background 0.15s, opacity 0.15s;
@@ -206,13 +243,22 @@
       background: #52525b;
     }
 
-    /* Logs & Atividades do Agente */
+    .btn-purple {
+      background: var(--purple);
+      color: white;
+    }
+
+    .btn-purple:hover:not(:disabled) {
+      background: #7c3aed;
+    }
+
+    /* Logs & Atividades */
     .agent-box {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px;
-      margin-bottom: 12px;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 8px;
     }
 
     .agent-log {
@@ -222,7 +268,7 @@
       background: #18181b;
       padding: 6px 8px;
       border-radius: 4px;
-      max-height: 80px;
+      max-height: 70px;
       overflow-y: auto;
       white-space: pre-wrap;
     }
@@ -232,17 +278,17 @@
       display: flex;
       flex-direction: column;
       background: var(--card-bg);
-      border-radius: 8px;
-      padding: 10px;
+      border-radius: 6px;
+      padding: 8px;
       border: 1px solid var(--border);
-      min-height: 120px;
+      min-height: 100px;
     }
 
     .response-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       font-size: 11px;
       color: var(--text-muted);
     }
@@ -251,7 +297,7 @@
       flex: 1;
       overflow-y: auto;
       font-size: 12px;
-      line-height: 1.45;
+      line-height: 1.4;
       white-space: pre-wrap;
       word-break: break-word;
       color: #e4e4e7;
@@ -260,12 +306,61 @@
     .copy-btn {
       background: transparent;
       color: var(--accent);
-      padding: 2px 6px;
+      padding: 2px 4px;
       font-size: 11px;
     }
 
     .copy-btn:hover {
       text-decoration: underline;
+    }
+
+    /* Fila em lote */
+    .progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: #333;
+      border-radius: 3px;
+      margin: 8px 0;
+      overflow: hidden;
+      display: none;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.3s;
+    }
+
+    .history-item {
+      background: var(--card-bg);
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 6px;
+      border-left: 3px solid var(--border);
+    }
+
+    .history-item.user {
+      border-left-color: var(--blue);
+    }
+
+    .history-item.assistant {
+      border-left-color: var(--accent);
+    }
+
+    .history-role {
+      font-size: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+      color: var(--text-muted);
+    }
+
+    .history-body {
+      font-size: 11px;
+      white-space: pre-wrap;
+      max-height: 120px;
+      overflow-y: auto;
     }
   </style>
 </head>
@@ -273,52 +368,101 @@
 
   <div class="header">
     <div class="header-title-row">
-      <h1>ChatGPT Assistant</h1>
+      <h1>ChatGPT Assistant Pro</h1>
     </div>
     <div class="status-tags">
       <div id="chatgptStatus" class="status-badge status-offline">
         <span class="status-dot"></span>
-        <span id="chatgptStatusText">Verificando ChatGPT...</span>
+        <span id="chatgptStatusText">ChatGPT: Procurando...</span>
       </div>
       <div id="bridgeStatus" class="status-badge status-blue">
         <span class="status-dot"></span>
-        <span id="bridgeStatusText">Bridge: Conectando...</span>
+        <span id="bridgeStatusText">Bridge: 4321</span>
       </div>
     </div>
   </div>
 
-  <!-- Atividades do Agente (CLI / Background) -->
-  <div class="agent-box">
-    <div class="section-title">Comunicação Direta com o Agente:</div>
-    <div id="agentLog" class="agent-log">Pronto para receber comandos automáticos via Bridge (porta 4321)...</div>
+  <div class="nav-tabs">
+    <button class="tab-btn active" data-tab="tab-chat">Chat & Envio</button>
+    <button class="tab-btn" data-tab="tab-batch">Fila Sequencial (Lote)</button>
+    <button class="tab-btn" data-tab="tab-history">Histórico & Imagens</button>
   </div>
 
-  <!-- Envio Manual / Controle -->
-  <div class="field-group">
-    <label class="section-title">Enviar Mensagem / Arquivos:</label>
-    <textarea id="promptInput" placeholder="Digite uma instrução ou pergunta para o ChatGPT..."></textarea>
-  </div>
-
-  <div class="field-group">
-    <div class="file-drop-area" id="dropArea">
-      <span>📎 Clique para adicionar arquivos (PDF, imagens, docs...)</span>
-      <input type="file" id="fileInput" multiple style="display: none;">
+  <!-- TAB 1: Chat Individual & Agente -->
+  <div id="tab-chat" class="tab-content active">
+    <div class="agent-box">
+      <div class="section-title">Log do Agente / Automação:</div>
+      <div id="agentLog" class="agent-log">Pronto para receber tarefas do Agente...</div>
     </div>
-    <div id="fileList"></div>
-  </div>
 
-  <div class="btn-row">
-    <button id="sendBtn" class="btn-primary" disabled>Enviar Mensagem</button>
-    <button id="newChatBtn" class="btn-secondary" title="Nova Conversa">Novo Chat</button>
-  </div>
-
-  <!-- Resposta do ChatGPT -->
-  <div class="response-card">
-    <div class="response-header">
-      <span class="section-title">Última Resposta:</span>
-      <button id="copyBtn" class="copy-btn">Copiar</button>
+    <div class="field-group">
+      <textarea id="promptInput" placeholder="Digite uma mensagem para o ChatGPT..."></textarea>
     </div>
-    <div id="responseContent" class="response-content">Nenhuma resposta capturada ainda.</div>
+
+    <div class="field-group">
+      <div class="file-drop-area" id="dropArea">
+        <span>📎 Anexar arquivos (PDF, imagens, planilhas...)</span>
+        <input type="file" id="fileInput" multiple style="display: none;">
+      </div>
+      <div id="fileList"></div>
+    </div>
+
+    <div class="btn-row">
+      <button id="sendBtn" class="btn-primary" disabled>Enviar</button>
+      <button id="newChatBtn" class="btn-secondary">Novo Chat</button>
+      <button id="stopBtn" class="btn-secondary" style="color: var(--danger);">Parar</button>
+    </div>
+
+    <div class="response-card">
+      <div class="response-header">
+        <span class="section-title">Última Resposta:</span>
+        <button id="copyBtn" class="copy-btn">Copiar</button>
+      </div>
+      <div id="responseContent" class="response-content">Nenhuma resposta capturada.</div>
+    </div>
+  </div>
+
+  <!-- TAB 2: Fila Sequencial em Lote (ex: 10 mensagens) -->
+  <div id="tab-batch" class="tab-content">
+    <div class="section-title">Fila de Mensagens Sequenciais:</div>
+    <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
+      Digite uma mensagem por linha (ex: 10 mensagens). O robô enviará uma por uma, aguardando cada uma terminar 100% antes de mandar a próxima.
+    </p>
+
+    <div class="field-group">
+      <textarea id="batchInput" style="height: 110px;" placeholder="Mensagem 1&#10;Mensagem 2&#10;Mensagem 3&#10;..."></textarea>
+    </div>
+
+    <div class="progress-bar-container" id="batchProgress">
+      <div class="progress-bar-fill" id="batchProgressFill"></div>
+    </div>
+    <div id="batchStatusText" style="font-size: 11px; color: #93c5fd; margin-bottom: 6px;"></div>
+
+    <div class="btn-row">
+      <button id="startBatchBtn" class="btn-purple" style="flex: 1;">▶ Executar Fila Sequencial</button>
+      <button id="cancelBatchBtn" class="btn-secondary" disabled>Cancelar</button>
+    </div>
+
+    <div class="response-card" style="max-height: 150px;">
+      <div class="response-header">
+        <span class="section-title">Log da Fila:</span>
+      </div>
+      <div id="batchLog" class="response-content">Aguardando execução...</div>
+    </div>
+  </div>
+
+  <!-- TAB 3: Histórico Completo & Imagens -->
+  <div id="tab-history" class="tab-content">
+    <div class="btn-row">
+      <button id="refreshHistoryBtn" class="btn-secondary" style="flex: 1;">📖 Ler Chat Completo</button>
+      <button id="downloadImagesBtn" class="btn-primary" style="flex: 1;">🖼️ Baixar Imagens</button>
+    </div>
+
+    <div id="historyStats" style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;"></div>
+
+    <div id="historyList" style="flex: 1; overflow-y: auto;">
+      <p style="color: var(--text-muted); font-size: 11px;">Clique em "Ler Chat Completo" para carregar as mensagens atuais.</p>
+    </div>
   </div>
 
   <script src="sidepanel.js"></script>
